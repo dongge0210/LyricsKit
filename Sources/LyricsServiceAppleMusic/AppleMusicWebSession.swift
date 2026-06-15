@@ -1,5 +1,6 @@
 import Foundation
 import WebKit
+import os
 import LyricsService
 
 /// A persistent `music.apple.com` session that calls the private amp-api from
@@ -63,11 +64,28 @@ public final class AppleMusicWebSession: NSObject {
             .path: "/",
             .name: "media-user-token",
             .value: mediaUserToken,
-            .secure: "TRUE",
+            .secure: true,
             .expires: Date.distantFuture,
-        ]) else { return }
+        ]) else {
+            Logger.AppleMusic.warning("Failed to create HTTPCookie — check token value")
+            return
+        }
 
         await cookieStore.setCookie(cookie)
+
+        // Verify cookie was stored correctly and value is preserved.
+        if let verified = await cookieStore.allCookies()
+            .first(where: { $0.name == "media-user-token" }) {
+            let match = verified.value == mediaUserToken
+            Logger.AppleMusic.debug("""
+                Cookie stored: \(match ? "✓" : "✗ MISMATCH")
+                  expected \(mediaUserToken.count) chars, got \(verified.value.count) chars
+                  prefix: \(String(mediaUserToken.prefix(20)))...
+                """)
+            if !match {
+                Logger.AppleMusic.warning("Cookie character mismatch — token may be corrupted")
+            }
+        }
 
         // Reload the page if the token changed so MusicKit re-reads the cookie.
         if previous != mediaUserToken || !didStartLoading {
@@ -205,4 +223,11 @@ extension AppleMusicWebSession: WKNavigationDelegate {
         pageLoadContinuation?.resume()
         pageLoadContinuation = nil
     }
+}
+
+// MARK: - Logger
+
+private extension Logger {
+    static let AppleMusic = Logger(
+        subsystem: "LyricsKit.AppleMusic", category: "WebSession")
 }

@@ -1,17 +1,6 @@
 import Foundation
 import MusicKit
-
-/// One song from the Apple Music catalog, flattened to the fields Route B
-/// needs. `name` / `artistName` are localized by the *storefront* they were
-/// fetched from.
-public struct AppleMusicCatalogSong: Sendable, Equatable {
-    public let id: String
-    public let name: String
-    public let artistName: String
-    public let albumName: String?
-    public let isrc: String?
-    public let durationInMillis: Int?
-}
+import LyricsService
 
 /// A thin wrapper over the Apple Music catalog API.
 ///

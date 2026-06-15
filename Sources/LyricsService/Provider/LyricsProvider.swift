@@ -8,7 +8,7 @@ public protocol LyricsProvider: Sendable {
     func lyrics(for request: LyricsSearchRequest) -> AsyncThrowingStream<Lyrics, Error>
 }
 
-protocol _LyricsProvider: LyricsProvider {
+public protocol _LyricsProvider: LyricsProvider {
     associatedtype LyricsToken
 
     static var service: String { get }
@@ -26,7 +26,7 @@ private enum LyricsProviderLog {
 }
 
 extension _LyricsProvider {
-    func lyrics(for request: LyricsSearchRequest) -> AsyncThrowingStream<Lyrics, Error> {
+    public func lyrics(for request: LyricsSearchRequest) -> AsyncThrowingStream<Lyrics, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {

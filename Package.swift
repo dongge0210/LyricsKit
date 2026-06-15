@@ -15,7 +15,7 @@ let package = Package(
         // Apple Music support is a separate product so widget/extension
         // targets are never forced to link WebKit.
         .library(
-            name: "LyricsKitAppleMusic",
+            name: "LyricsServiceAppleMusic",
             targets: ["LyricsServiceAppleMusic"]
         ),
     ],
@@ -34,14 +34,16 @@ let package = Package(
                 "LyricsCore",
                 "LyricsService",
                 "LyricsServiceUI",
-            ]
+            ],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .target(
             name: "LyricsCore",
             dependencies: [
                 .product(name: "Regex", package: "Regex"),
                 .product(name: "SwiftCF", package: "SwiftCF"),
-            ]
+            ],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .target(
             name: "LyricsService",
@@ -52,21 +54,24 @@ let package = Package(
                 .product(name: "BigInt", package: "BigInt"),
                 .product(name: "CryptoSwift", package: "CryptoSwift"),
                 .product(name: "FoundationToolbox", package: "FrameworkToolbox"),
-            ]
+            ],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .target(
             name: "LyricsServiceUI",
             dependencies: [
                 "LyricsCore",
                 "LyricsService",
-            ]
+            ],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .target(
             name: "LyricsServiceAppleMusic",
             dependencies: [
                 "LyricsCore",
                 "LyricsService",
-            ]
+            ],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(
             name: "LyricsKitTests",
@@ -76,8 +81,8 @@ let package = Package(
             ],
             resources: [
                 .copy("Fixtures"),
-            ]
+            ],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
     ],
-    swiftLanguageModes: [.v5]
 )

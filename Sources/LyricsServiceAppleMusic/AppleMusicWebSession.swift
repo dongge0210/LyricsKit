@@ -1,5 +1,6 @@
 import Foundation
 import WebKit
+import LyricsService
 
 // `AppleMusicError` lives in AppleMusicError.swift.
 //

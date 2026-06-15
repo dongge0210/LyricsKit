@@ -32,7 +32,7 @@ public final class AppleMusicWebSession: NSObject {
     private var didStartLoading = false
     private var pageLoadContinuation: CheckedContinuation<Void, Never>?
 
-    public init() {
+    public override init() {
         let configuration = WKWebViewConfiguration()
         // The default website data store is persistent: cookies survive
         // relaunches so the token only needs to be injected once.

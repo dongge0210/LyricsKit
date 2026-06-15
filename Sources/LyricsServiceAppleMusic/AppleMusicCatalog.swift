@@ -29,7 +29,12 @@ public struct AppleMusicCatalog: Sendable {
     public func search(
         term: String, storefront: String, limit: Int = 10
     ) async throws -> [AppleMusicCatalogSong] {
-        let encoded = term.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? term
+        let encoded = term.addingPercentEncoding(
+            withAllowedCharacters: {
+                var cs = CharacterSet.urlQueryAllowed
+                cs.remove(charactersIn: "&$+,\n#")
+                return cs
+            }()) ?? term
         let path =
             "/v1/catalog/\(storefront)/search?term=\(encoded)&types=songs&limit=\(limit)"
         let data = try await AppleMusicWebSession.shared.musicAPI(path)

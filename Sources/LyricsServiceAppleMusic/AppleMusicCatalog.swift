@@ -63,7 +63,7 @@ public struct AppleMusicCatalog: Sendable {
 
 /// MusicKit's `music.api.music(path)` wraps every API response in `{"data": <payload>}`.
 /// This generic wrapper strips that layer before the domain models decode the payload.
-private struct MusicKitWrapper<T: Decodable>: Decodable {
+struct MusicKitWrapper<T: Decodable>: Decodable {
     let data: T
 }
 

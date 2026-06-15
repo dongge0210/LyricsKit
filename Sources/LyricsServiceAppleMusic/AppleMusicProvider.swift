@@ -64,7 +64,8 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
 
         let response: TTMLLyricsResponse
         do {
-            response = try JSONDecoder().decode(TTMLLyricsResponse.self, from: data)
+            let wrapper = try JSONDecoder().decode(MusicKitWrapper<TTMLLyricsResponse>.self, from: data)
+            response = wrapper.data
         } catch {
             throw LyricsProviderError.processingFailed(
                 reason: "Failed to decode TTML response: \(error.localizedDescription)"

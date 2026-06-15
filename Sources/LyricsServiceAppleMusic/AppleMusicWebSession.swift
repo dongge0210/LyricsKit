@@ -73,18 +73,14 @@ public final class AppleMusicWebSession: NSObject {
 
         await cookieStore.setCookie(cookie)
 
-        // Verify cookie was stored correctly and value is preserved.
+        // HTTPCookie value getter may URL-decode '+' → space on read-back.
+        // The real test is what the browser actually sees. Verify from JS.
         if let verified = await cookieStore.allCookies()
             .first(where: { $0.name == "media-user-token" }) {
-            let match = verified.value == mediaUserToken
             Logger.AppleMusic.debug("""
-                Cookie stored: \(match ? "✓" : "✗ MISMATCH")
-                  expected \(mediaUserToken.count) chars, got \(verified.value.count) chars
-                  prefix: \(String(mediaUserToken.prefix(20)))...
+                HTTPCookie.value (Swift round-trip): \(verified.value.count) chars
+                  prefix: \(String(verified.value.prefix(20)))...
                 """)
-            if !match {
-                Logger.AppleMusic.warning("Cookie character mismatch — token may be corrupted")
-            }
         }
 
         // Reload the page if the token changed so MusicKit re-reads the cookie.
@@ -96,6 +92,42 @@ public final class AppleMusicWebSession: NSObject {
             }
             // Block until the page (and MusicKit) are ready.
             await waitForPageLoad()
+
+            // Verify the cookie from the JS side (what the browser actually sees).
+            let jsCookie: String? = try? await webView.callAsyncJavaScript(
+                """
+                document.cookie.split(';')
+                    .map(c => c.trim())
+                    .find(c => c.startsWith('media-user-token='))
+                    ?.replace('media-user-token=', '') || ''
+                """,
+                arguments: [:], in: nil, contentWorld: .page
+            ) as? String
+            if let jsVal = jsCookie, !jsVal.isEmpty {
+                let match = jsVal == mediaUserToken
+                Logger.AppleMusic.debug("""
+                    Cookie from document.cookie: \(match ? "✓ MATCH" : "✗ MISMATCH")
+                      JS sees \(jsVal.count) chars
+                      prefix: \(String(jsVal.prefix(20)))...
+                    """)
+
+                // If '+' characters were corrupted to spaces, fix by setting
+                // via JavaScript with encodeURIComponent.
+                if !match {
+                    Logger.AppleMusic.warning(
+                        "Token corrupted in cookie storage — applying JS-side fix")
+                    let escaped = mediaUserToken
+                        .replacingOccurrences(of: "\\", with: "\\\\")
+                        .replacingOccurrences(of: "'", with: "\\'")
+                    _ = try? await webView.callAsyncJavaScript(
+                        """
+                        document.cookie = 'media-user-token=' + encodeURIComponent('\(escaped)') +
+                            '; domain=.apple.com; path=/; secure';
+                        """,
+                        arguments: [:], in: nil, contentWorld: .page
+                    )
+                }
+            }
         }
     }
 

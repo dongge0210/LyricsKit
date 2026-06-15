@@ -17,8 +17,8 @@ public struct AppleMusicCatalog: Sendable {
     /// The signed-in account's storefront id, e.g. `cn`, `tw`, `jp`.
     public func storefront() async throws -> String {
         let data = try await AppleMusicWebSession.shared.musicAPI("/v1/me/storefront")
-        let response = try JSONDecoder().decode(StorefrontResponse.self, from: data)
-        guard let id = response.data.first?.id else {
+        let wrapper = try JSONDecoder().decode(MusicKitWrapper<StorefrontResponse>.self, from: data)
+        guard let id = wrapper.data.data.first?.id else {
             throw AppleMusicError.unexpectedResponse
         }
         return id
@@ -32,16 +32,16 @@ public struct AppleMusicCatalog: Sendable {
         let path =
             "/v1/catalog/\(storefront)/search?term=\(encoded)&types=songs&limit=\(limit)"
         let data = try await AppleMusicWebSession.shared.musicAPI(path)
-        let response = try JSONDecoder().decode(SearchResponse.self, from: data)
-        return (response.results.songs?.data ?? []).map(\.flattened)
+        let wrapper = try JSONDecoder().decode(MusicKitWrapper<SearchResponse>.self, from: data)
+        return (wrapper.data.results.songs?.data ?? []).map(\.flattened)
     }
 
     /// Look up a single catalog song by its adamID within a storefront.
     public func song(id: String, storefront: String) async throws -> AppleMusicCatalogSong {
         let data = try await AppleMusicWebSession.shared.musicAPI(
             "/v1/catalog/\(storefront)/songs/\(id)")
-        let response = try JSONDecoder().decode(SongListResponse.self, from: data)
-        guard let song = response.data.first else {
+        let wrapper = try JSONDecoder().decode(MusicKitWrapper<SongListResponse>.self, from: data)
+        guard let song = wrapper.data.data.first else {
             throw AppleMusicError.unexpectedResponse
         }
         return song.flattened
@@ -54,12 +54,18 @@ public struct AppleMusicCatalog: Sendable {
     public func songs(isrc: String, storefront: String) async throws -> [AppleMusicCatalogSong] {
         let data = try await AppleMusicWebSession.shared.musicAPI(
             "/v1/catalog/\(storefront)/songs?filter[isrc]=\(isrc)")
-        let response = try JSONDecoder().decode(SongListResponse.self, from: data)
-        return response.data.map(\.flattened)
+        let wrapper = try JSONDecoder().decode(MusicKitWrapper<SongListResponse>.self, from: data)
+        return wrapper.data.data.map(\.flattened)
     }
 }
 
 // MARK: - Apple Music API wire models
+
+/// MusicKit's `music.api.music(path)` wraps every API response in `{"data": <payload>}`.
+/// This generic wrapper strips that layer before the domain models decode the payload.
+private struct MusicKitWrapper<T: Decodable>: Decodable {
+    let data: T
+}
 
 private struct StorefrontResponse: Decodable {
     let data: [Storefront]

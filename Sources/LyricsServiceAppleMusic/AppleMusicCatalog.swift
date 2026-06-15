@@ -1,13 +1,14 @@
 import Foundation
-import MusicKit
 import LyricsService
 
-/// A thin wrapper over the Apple Music catalog API.
+/// A thin wrapper over the Apple Music catalog API, routed through the
+/// `AppleMusicWebSession` (web player's `MusicKit` instance) so no
+/// Apple-issued developer token is required.
 ///
-/// Requests go through MusicKit's `MusicDataRequest`, which injects the
-/// developer token (and the user token, once `MusicAuthorization` is granted)
-/// automatically — no WKWebView and no manual token handling. Requires the
-/// MusicKit App Service to be enabled on the host app's App ID.
+/// The public `MusicDataRequest` transport is unavailable because
+/// `dev.dongge0210.LyricsX` is not registered as a MusicKit client
+/// identifier. The web player ships its own developer token; we
+/// piggyback on that by calling `AppleMusicWebSession.shared.musicAPI()`.
 @available(macOS 12.0, *)
 public struct AppleMusicCatalog: Sendable {
 
@@ -15,7 +16,7 @@ public struct AppleMusicCatalog: Sendable {
 
     /// The signed-in account's storefront id, e.g. `cn`, `tw`, `jp`.
     public func storefront() async throws -> String {
-        let data = try await get(path: "/v1/me/storefront")
+        let data = try await AppleMusicWebSession.shared.musicAPI("/v1/me/storefront")
         let response = try JSONDecoder().decode(StorefrontResponse.self, from: data)
         guard let id = response.data.first?.id else {
             throw AppleMusicError.unexpectedResponse
@@ -27,20 +28,18 @@ public struct AppleMusicCatalog: Sendable {
     public func search(
         term: String, storefront: String, limit: Int = 10
     ) async throws -> [AppleMusicCatalogSong] {
-        let data = try await get(
-            path: "/v1/catalog/\(storefront)/search",
-            queryItems: [
-                URLQueryItem(name: "types", value: "songs"),
-                URLQueryItem(name: "term", value: term),
-                URLQueryItem(name: "limit", value: String(limit)),
-            ])
+        let encoded = term.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? term
+        let path =
+            "/v1/catalog/\(storefront)/search?term=\(encoded)&types=songs&limit=\(limit)"
+        let data = try await AppleMusicWebSession.shared.musicAPI(path)
         let response = try JSONDecoder().decode(SearchResponse.self, from: data)
         return (response.results.songs?.data ?? []).map(\.flattened)
     }
 
     /// Look up a single catalog song by its adamID within a storefront.
     public func song(id: String, storefront: String) async throws -> AppleMusicCatalogSong {
-        let data = try await get(path: "/v1/catalog/\(storefront)/songs/\(id)")
+        let data = try await AppleMusicWebSession.shared.musicAPI(
+            "/v1/catalog/\(storefront)/songs/\(id)")
         let response = try JSONDecoder().decode(SongListResponse.self, from: data)
         guard let song = response.data.first else {
             throw AppleMusicError.unexpectedResponse
@@ -53,31 +52,10 @@ public struct AppleMusicCatalog: Sendable {
     /// ISRC is the only storefront-independent key for a recording, so this is
     /// how Route B locates the same song in its native-script storefront.
     public func songs(isrc: String, storefront: String) async throws -> [AppleMusicCatalogSong] {
-        let data = try await get(
-            path: "/v1/catalog/\(storefront)/songs",
-            queryItems: [URLQueryItem(name: "filter[isrc]", value: isrc)])
+        let data = try await AppleMusicWebSession.shared.musicAPI(
+            "/v1/catalog/\(storefront)/songs?filter[isrc]=\(isrc)")
         let response = try JSONDecoder().decode(SongListResponse.self, from: data)
         return response.data.map(\.flattened)
-    }
-
-    /// Execute an Apple Music API GET through MusicKit and return the raw body.
-    /// `MusicDataRequest` attaches the developer/user tokens itself.
-    private func get(path: String, queryItems: [URLQueryItem] = []) async throws -> Data {
-        var components = URLComponents()
-        components.scheme = "https"
-        components.host = "api.music.apple.com"
-        components.path = path
-        if !queryItems.isEmpty {
-            components.queryItems = queryItems
-        }
-        guard let url = components.url else {
-            throw AppleMusicError.unexpectedResponse
-        }
-        // Bound each catalog call so a slow network can't keep a Route B
-        // search alive for the URLSession default of 60s.
-        var urlRequest = URLRequest(url: url)
-        urlRequest.timeoutInterval = 10
-        return try await MusicDataRequest(urlRequest: urlRequest).response().data
     }
 }
 

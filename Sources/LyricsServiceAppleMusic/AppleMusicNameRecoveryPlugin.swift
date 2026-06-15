@@ -1,7 +1,6 @@
 import Foundation
 import os
 import LyricsService
-import MusicKit
 
 /// Route B — a lyrics-search *plugin*, not a lyrics source.
 ///
@@ -50,9 +49,10 @@ public struct AppleMusicNameRecoveryPlugin: LyricsSearchRequestPlugin {
     public func additionalRequests(
         for request: LyricsSearchRequest
     ) async -> [LyricsSearchRequest] {
-        // Catalog requests need a developer token, which MusicKit only
-        // vends once the user has authorized Apple Music access.
-        guard MusicAuthorization.currentStatus == .authorized else {
+        // Catalog requests go through the web session now — no MusicKit
+        // developer token needed. Only run if the user has configured a
+        // media-user-token and the web session is authorized.
+        guard (try? await AppleMusicWebSession.shared.isAuthorized()) == true else {
             return []
         }
         do {

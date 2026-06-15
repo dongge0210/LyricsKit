@@ -2,51 +2,94 @@ import Foundation
 import WebKit
 import LyricsService
 
-// `AppleMusicError` lives in AppleMusicError.swift.
-//
-// NOTE: as of the MusicKit transport switch, the Route B catalog path uses
-// `MusicDataRequest` (see AppleMusicCatalog) and does NOT use this class.
-// `AppleMusicWebSession` is kept for a possible future Route A (official
-// syllable-lyrics), whose user-token endpoint may still need the web session.
-
-/// A persistent, signed-in `music.apple.com` session that calls the private
-/// amp-api from *inside* the page.
+/// A persistent `music.apple.com` session that calls the private amp-api from
+/// *inside* the page.
 ///
-/// Native `URLSession` requests to amp-api fail with HTTP 401 — they lack the
-/// browser's session cookies. Routing the request through the web player's own
-/// `MusicKit.getInstance().api.music(path)` carries the correct developer
-/// token, user token, cookies and origin, and refreshes the token
-/// automatically. This class owns the `WKWebView` hosting that page.
+/// Unlike a native `URLSession`, amp-api requires the browser's session cookies
+/// and Apple's developer token (extracted from the web player's `MusicKit`
+/// instance). This class hosts a single background `WKWebView` that never
+/// appears on screen.
 ///
-/// The user signs in once with their own Apple ID; the persistent website data
-/// store keeps that session across launches.
+/// The user **never signs in** through the web view. Instead the host app
+/// injects a `media-user-token` cookie (pasted by the user) before the first
+/// load, and `MusicKit` on the page picks it up as if the user were already
+/// authenticated.
+///
+/// No MusicKit entitlement, no `MusicAuthorization`, no registration with Apple
+/// required.
 @available(macOS 12.0, *)
 @MainActor
 public final class AppleMusicWebSession {
 
-    /// Shared session, used by the Apple Music providers and the sign-in UI.
+    /// Shared session, used by the Apple Music providers.
     public static let shared = AppleMusicWebSession()
 
-    /// The web view hosting `music.apple.com`. The host app presents this for
-    /// the one-time sign-in and may keep it alive (off-screen) afterwards.
+    /// The web view hosting `music.apple.com`. Kept off-screen; never added to
+    /// a window.
     public let webView: WKWebView
 
+    private var configuredToken: String?
     private var didStartLoading = false
 
     public init() {
         let configuration = WKWebViewConfiguration()
-        // The default website data store is persistent: the sign-in survives
-        // relaunches, so the user only authenticates once.
+        // The default website data store is persistent: cookies survive
+        // relaunches so the token only needs to be injected once.
         webView = WKWebView(frame: .zero, configuration: configuration)
-        // music.apple.com only serves the full web player to a desktop browser.
+        // music.apple.com only serves the full web player to a desktop UA.
         webView.customUserAgent =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
             + "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
     }
 
-    /// Navigate to `music.apple.com` if it has not been loaded yet. Safe to
-    /// call repeatedly; only the first call triggers a navigation.
-    public func startLoadingIfNeeded() {
+    // MARK: - Token Configuration
+
+    /// Inject the user's `media-user-token` as a `.apple.com` cookie and
+    /// navigate to `music.apple.com` so the page's `MusicKit` instance can
+    /// discover it.
+    ///
+    /// Call once on startup and whenever the user changes the token in
+    /// preferences. Safe to call repeatedly — the cookie store is idempotent.
+    public func configure(mediaUserToken: String) async {
+        let previous = configuredToken
+        configuredToken = mediaUserToken
+
+        let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
+        guard let cookie = HTTPCookie(properties: [
+            .domain: ".apple.com",
+            .path: "/",
+            .name: "media-user-token",
+            .value: mediaUserToken,
+            .secure: "TRUE",
+            .expires: Date.distantFuture,
+        ]) else { return }
+
+        await cookieStore.setCookie(cookie)
+
+        // Reload the page if the token changed so MusicKit re-reads the cookie.
+        if previous != mediaUserToken || !didStartLoading {
+            if didStartLoading {
+                webView.reload()
+            } else {
+                startLoading()
+            }
+        }
+    }
+
+    /// Clear the stored token and cookies to sign out.
+    public func clearToken() async {
+        configuredToken = nil
+        let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
+        let cookies = await cookieStore.allCookies()
+        for cookie in cookies where cookie.name == "media-user-token" {
+            await cookieStore.deleteCookie(cookie)
+        }
+        webView.reload()
+    }
+
+    // MARK: - Session Lifecycle
+
+    private func startLoading() {
         guard !didStartLoading, let url = URL(string: "https://music.apple.com") else {
             return
         }
@@ -54,8 +97,10 @@ public final class AppleMusicWebSession {
         webView.load(URLRequest(url: url))
     }
 
-    /// Whether the web player reports a completed Apple Music sign-in.
+    /// Whether the web player reports a completed Apple Music sign-in (i.e. the
+    /// injected `media-user-token` cookie was recognised).
     public func isAuthorized() async -> Bool {
+        guard configuredToken != nil else { return false }
         let probe = """
         try {
             const music = MusicKit.getInstance();
@@ -69,15 +114,13 @@ public final class AppleMusicWebSession {
         return (result as? Bool) ?? false
     }
 
+    // MARK: - amp-api
+
     /// Call an amp-api path through the web player's `MusicKit` instance and
     /// return the raw response body as JSON `Data`.
     ///
     /// - Parameter path: an amp-api path, e.g. `/v1/catalog/cn/songs/535824738`.
     public func musicAPI(_ path: String) async throws -> Data {
-        // Runs in the page's content world so `MusicKit` is in scope. The
-        // result is double-encoded — an `{ok,body,error}` envelope whose
-        // `body` is the response JSON as a string — so a JS-side error can be
-        // reported without it looking like a malformed response.
         let functionBody = """
         const music = MusicKit.getInstance();
         if (!music || !music.api || typeof music.api.music !== 'function') {

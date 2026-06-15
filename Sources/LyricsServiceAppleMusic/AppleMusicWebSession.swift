@@ -259,7 +259,7 @@ extension AppleMusicWebSession: WKNavigationDelegate {
 
 // MARK: - Logger
 
-private extension Logger {
+extension Logger {
     static let AppleMusic = Logger(
         subsystem: "LyricsKit.AppleMusic", category: "WebSession")
 }

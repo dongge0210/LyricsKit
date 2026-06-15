@@ -150,10 +150,7 @@ public final class AppleMusicWebSession: NSObject {
         }
         try {
             const response = await music.api.music(path);
-            const payload = (response && response.data !== undefined)
-                ? response.data
-                : response;
-            return JSON.stringify({ ok: true, body: JSON.stringify(payload) });
+            return JSON.stringify({ ok: true, body: JSON.stringify(response) });
         } catch (error) {
             return JSON.stringify({
                 ok: false,

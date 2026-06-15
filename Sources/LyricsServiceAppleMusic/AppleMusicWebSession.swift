@@ -30,6 +30,7 @@ public final class AppleMusicWebSession {
 
     private var configuredToken: String?
     private var didStartLoading = false
+    private var pageLoadContinuation: CheckedContinuation<Void, Never>?
 
     public init() {
         let configuration = WKWebViewConfiguration()
@@ -40,13 +41,14 @@ public final class AppleMusicWebSession {
         webView.customUserAgent =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
             + "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+        webView.navigationDelegate = self
     }
 
     // MARK: - Token Configuration
 
-    /// Inject the user's `media-user-token` as a `.apple.com` cookie and
-    /// navigate to `music.apple.com` so the page's `MusicKit` instance can
-    /// discover it.
+    /// Inject the user's `media-user-token` as a `.apple.com` cookie, navigate
+    /// to `music.apple.com`, and wait until the page (and its MusicKit runtime)
+    /// are ready before returning.
     ///
     /// Call once on startup and whenever the user changes the token in
     /// preferences. Safe to call repeatedly — the cookie store is idempotent.
@@ -73,6 +75,8 @@ public final class AppleMusicWebSession {
             } else {
                 startLoading()
             }
+            // Block until the page (and MusicKit) are ready.
+            await waitForPageLoad()
         }
     }
 
@@ -95,6 +99,23 @@ public final class AppleMusicWebSession {
         }
         didStartLoading = true
         webView.load(URLRequest(url: url))
+    }
+
+    /// Returns after the page has finished loading AND MusicKit is ready.
+    private func waitForPageLoad() async {
+        // Wait for WKWebView to finish loading the page.
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            pageLoadContinuation = cont
+        }
+
+        // The page DOM is ready, but MusicKit's script may still be loading.
+        // Poll a few times for `MusicKit.getInstance().isAuthorized`.
+        for _ in 0..<8 {
+            if await isAuthorized() {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
+        }
     }
 
     /// Whether the web player reports a completed Apple Music sign-in (i.e. the
@@ -169,5 +190,21 @@ public final class AppleMusicWebSession {
             throw AppleMusicError.musicKitUnavailable
         }
         throw AppleMusicError.api(message)
+    }
+}
+
+// MARK: - WKNavigationDelegate
+
+@available(macOS 12.0, *)
+extension AppleMusicWebSession: WKNavigationDelegate {
+
+    public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        pageLoadContinuation?.resume()
+        pageLoadContinuation = nil
+    }
+
+    public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        pageLoadContinuation?.resume()
+        pageLoadContinuation = nil
     }
 }

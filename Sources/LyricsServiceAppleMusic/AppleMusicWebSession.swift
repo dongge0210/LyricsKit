@@ -226,9 +226,17 @@ public final class AppleMusicWebSession: NSObject {
 
         if envelope["ok"] as? Bool == true {
             guard let bodyString = envelope["body"] as? String,
-                  let bodyData = bodyString.data(using: .utf8)
+                  let bodyData = bodyString.data(using: .utf8),
+                  let bodyJson = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
             else {
                 throw AppleMusicError.unexpectedResponse
+            }
+            // `music.api.music(path)` returns a Fetch-like object
+            // { url, status, text: "<api_response_json>" }.
+            // Extract the embedded JSON for downstream decoders.
+            if let textString = bodyJson["text"] as? String,
+               let textData = textString.data(using: .utf8) {
+                return textData
             }
             return bodyData
         }

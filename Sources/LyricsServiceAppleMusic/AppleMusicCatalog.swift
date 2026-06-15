@@ -39,8 +39,8 @@ public struct AppleMusicCatalog: Sendable {
             "/v1/catalog/\(storefront)/search?term=\(encoded)&types=songs&limit=\(limit)"
         let data = try await AppleMusicWebSession.shared.musicAPI(path)
         do {
-            let wrapper = try JSONDecoder().decode(MusicKitWrapper<SongListResponse>.self, from: data)
-            return wrapper.data.data.map(\.flattened)
+            let wrapper = try JSONDecoder().decode(MusicKitWrapper<SearchResponse>.self, from: data)
+            return (wrapper.data.results.songs?.data ?? []).map(\.flattened)
         } catch {
             // Debug: dump raw response to figure out MusicKit's actual format
             if let raw = String(data: data, encoding: .utf8) {
@@ -94,8 +94,18 @@ private struct SongListResponse: Decodable {
     let data: [CatalogSongResource]
 }
 
-/// `GET .../search`  — MusicKit returns the same flat `{ "data": [song] }` shape
-/// as the regular songs endpoint.
+/// `GET .../search` nests the songs under `results.songs.data`.
+private struct SearchResponse: Decodable {
+    let results: Results
+
+    struct Results: Decodable {
+        let songs: SongList?
+
+        struct SongList: Decodable {
+            let data: [CatalogSongResource]
+        }
+    }
+}
 
 private struct CatalogSongResource: Decodable {
     let id: String

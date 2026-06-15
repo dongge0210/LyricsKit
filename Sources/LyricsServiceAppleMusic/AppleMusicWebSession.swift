@@ -19,7 +19,7 @@ import LyricsService
 /// required.
 @available(macOS 12.0, *)
 @MainActor
-public final class AppleMusicWebSession {
+public final class AppleMusicWebSession: NSObject {
 
     /// Shared session, used by the Apple Music providers.
     public static let shared = AppleMusicWebSession()

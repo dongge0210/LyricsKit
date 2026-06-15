@@ -1,13 +1,14 @@
 import Foundation
-import MusicKit
 import LyricsCore
 import LyricsService
 
 // MARK: - Apple Music Lyrics Provider
 
 /// Fetches word-timed (syllable) lyrics from Apple Music via the internal
-/// amp-api, using MusicKit's native `MusicDataRequest` with the user's
-/// media-user-token (obtained through `MusicAuthorization`).
+/// amp-api. The syllable-lyrics endpoint is NOT part of the public MusicKit
+/// catalog API — it only responds to the web player's authenticated session
+/// (page-level `MusicKit.getInstance().api.music()`). `MusicDataRequest`
+/// returns HTML/401 on this path.
 @available(macOS 12.0, *)
 extension LyricsProviders {
     public final class AppleMusic {
@@ -52,21 +53,9 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
         let songID = token.song.id
         let path = "/v1/catalog/\(storefront)/songs/\(songID)/syllable-lyrics?extend=ttmlLocalizations"
 
-        var components = URLComponents()
-        components.scheme = "https"
-        components.host = "api.music.apple.com"
-        components.path = path
-        guard let url = components.url else {
-            throw LyricsProviderError.processingFailed(
-                reason: "Failed to construct Apple Music lyrics URL."
-            )
-        }
-        var urlRequest = URLRequest(url: url)
-        urlRequest.timeoutInterval = 10
-
         let data: Data
         do {
-            data = try await MusicDataRequest(urlRequest: urlRequest).response().data
+            data = try await AppleMusicWebSession.shared.musicAPI(path)
         } catch {
             throw LyricsProviderError.processingFailed(
                 reason: "Apple Music amp-api request failed: \(error.localizedDescription)"

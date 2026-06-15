@@ -1,5 +1,6 @@
 import Foundation
 import LyricsService
+import os
 
 /// A thin wrapper over the Apple Music catalog API, routed through the
 /// `AppleMusicWebSession` (web player's `MusicKit` instance) so no
@@ -32,8 +33,16 @@ public struct AppleMusicCatalog: Sendable {
         let path =
             "/v1/catalog/\(storefront)/search?term=\(encoded)&types=songs&limit=\(limit)"
         let data = try await AppleMusicWebSession.shared.musicAPI(path)
-        let wrapper = try JSONDecoder().decode(MusicKitWrapper<SearchResponse>.self, from: data)
-        return (wrapper.data.results.songs?.data ?? []).map(\.flattened)
+        do {
+            let wrapper = try JSONDecoder().decode(MusicKitWrapper<SearchResponse>.self, from: data)
+            return (wrapper.data.results.songs?.data ?? []).map(\.flattened)
+        } catch {
+            // Debug: dump raw response to figure out MusicKit's actual format
+            if let raw = String(data: data, encoding: .utf8) {
+                Logger.AppleMusic.debug("search decode failed, raw: \(String(raw.prefix(300)))…")
+            }
+            throw error
+        }
     }
 
     /// Look up a single catalog song by its adamID within a storefront.

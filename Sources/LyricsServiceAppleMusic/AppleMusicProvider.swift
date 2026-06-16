@@ -1,6 +1,7 @@
 import Foundation
 import LyricsCore
 import LyricsService
+import os
 
 // MARK: - Apple Music Lyrics Provider
 
@@ -43,7 +44,9 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
             term = "\(title) \(artist)"
         }
 
+        Logger.AppleMusic.debug("search request: term=\(term)")
         let songs = try await catalog.search(term: term, storefront: storefront)
+        Logger.AppleMusic.debug("provider search: \(songs.count) tokens")
         return songs.map { LyricsToken(song: $0) }
     }
 
@@ -52,11 +55,13 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
         let storefront = try await catalog.storefront()
         let songID = token.song.id
         let path = "/v1/catalog/\(storefront)/songs/\(songID)/syllable-lyrics?extend=ttmlLocalizations"
+        Logger.AppleMusic.debug("fetch lyrics: \(token.song.name) (id=\(songID))")
 
         let data: Data
         do {
             data = try await AppleMusicWebSession.shared.musicAPI(path)
         } catch {
+            Logger.AppleMusic.error("musicAPI failed: \(error.localizedDescription)")
             throw LyricsProviderError.processingFailed(
                 reason: "Apple Music amp-api request failed: \(error.localizedDescription)"
             )
@@ -67,6 +72,9 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
             let wrapper = try JSONDecoder().decode(MusicKitWrapper<TTMLLyricsResponse>.self, from: data)
             response = wrapper.data
         } catch {
+            if let raw = String(data: data, encoding: .utf8) {
+                Logger.AppleMusic.error("TTML decode failed, raw: \(String(raw.prefix(200)))")
+            }
             throw LyricsProviderError.processingFailed(
                 reason: "Failed to decode TTML response: \(error.localizedDescription)"
             )
@@ -83,6 +91,8 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
                 reason: "Failed to parse TTML lyrics for track \(songID)"
             )
         }
+
+        Logger.AppleMusic.debug("lyrics fetched & parsed OK")
 
         lyrics.applyMetadata(
             title: token.song.name,

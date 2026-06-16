@@ -22,6 +22,7 @@ public struct AppleMusicCatalog: Sendable {
         guard let id = wrapper.data.data.first?.id else {
             throw AppleMusicError.unexpectedResponse
         }
+        Logger.AppleMusic.debug("storefront: \(id)")
         return id
     }
 
@@ -37,10 +38,13 @@ public struct AppleMusicCatalog: Sendable {
             }()) ?? term
         let path =
             "/v1/catalog/\(storefront)/search?term=\(encoded)&types=songs&limit=\(limit)"
+        Logger.AppleMusic.debug("search term: \(term), storefront: \(storefront)")
         let data = try await AppleMusicWebSession.shared.musicAPI(path)
         do {
             let wrapper = try JSONDecoder().decode(MusicKitWrapper<SearchResponse>.self, from: data)
-            return (wrapper.data.results.songs?.data ?? []).map(\.flattened)
+            let results = (wrapper.data.results.songs?.data ?? []).map(\.flattened)
+            Logger.AppleMusic.debug("search returned \(results.count) songs")
+            return results
         } catch {
             // Debug: dump raw response to figure out MusicKit's actual format
             if let raw = String(data: data, encoding: .utf8) {
@@ -75,10 +79,25 @@ public struct AppleMusicCatalog: Sendable {
 
 // MARK: - Apple Music API wire models
 
-/// MusicKit's `music.api.music(path)` wraps every API response in `{"data": <payload>}`.
-/// This generic wrapper strips that layer before the domain models decode the payload.
+/// MusicKit's `music.api.music(path)` generally wraps every API response in `{"data": <payload>}`.
+/// However the web player's behavior can vary: sometimes the returned payload is already
+/// the underlying API response object. This wrapper supports both the envelope form
+/// and the direct payload form.
 struct MusicKitWrapper<T: Decodable>: Decodable {
     let data: T
+
+    private enum CodingKeys: String, CodingKey {
+        case data
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        do {
+            data = try container.decode(T.self, forKey: .data)
+        } catch {
+            data = try T(from: decoder)
+        }
+    }
 }
 
 private struct StorefrontResponse: Decodable {

@@ -1,6 +1,7 @@
 import Foundation
 import WebKit
 import os
+import LyricsService
 
 /// A persistent `music.apple.com` session that calls the private amp-api from
 /// *inside* the page.

@@ -1,5 +1,6 @@
 import Foundation
 import os
+import LyricsService
 
 /// Route B — a lyrics-search *plugin*, not a lyrics source.
 ///

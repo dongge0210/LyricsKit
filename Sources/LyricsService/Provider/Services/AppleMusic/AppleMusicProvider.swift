@@ -1,6 +1,7 @@
 import Foundation
 import LyricsCore
 import os
+import LyricsService
 
 // MARK: - Apple Music Lyrics Provider
 

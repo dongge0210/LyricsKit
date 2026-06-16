@@ -1,5 +1,6 @@
 import Foundation
 import os
+import LyricsService
 
 /// A thin wrapper over the Apple Music catalog API, routed through the
 /// `AppleMusicWebSession` (web player's `MusicKit` instance) so no

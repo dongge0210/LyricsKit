@@ -12,12 +12,6 @@ let package = Package(
             name: "LyricsKit",
             targets: ["LyricsKit"]
         ),
-        // Apple Music support is a separate product so widget/extension
-        // targets are never forced to link WebKit.
-        .library(
-            name: "LyricsServiceAppleMusic",
-            targets: ["LyricsServiceAppleMusic"]
-        ),
     ],
     dependencies: [
         .package(url: "https://github.com/ddddxxx/Regex", from: "1.0.1"),
@@ -65,14 +59,7 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
-        .target(
-            name: "LyricsServiceAppleMusic",
-            dependencies: [
-                "LyricsCore",
-                "LyricsService",
-            ],
-            swiftSettings: [.swiftLanguageMode(.v5)]
-        ),
+
         .testTarget(
             name: "LyricsKitTests",
             dependencies: [

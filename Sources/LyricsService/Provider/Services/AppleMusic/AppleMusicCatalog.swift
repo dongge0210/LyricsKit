@@ -1,5 +1,4 @@
 import Foundation
-import LyricsService
 import os
 
 /// A thin wrapper over the Apple Music catalog API, routed through the

@@ -98,6 +98,16 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
             )
         }
 
+        // Reject if no lines have timing data (all positions zero + no timetag)
+        let hasLinesWithTime = lyrics.lines.contains { line in
+            line.position != 0 || line.attachments.timetag != nil
+        }
+        guard hasLinesWithTime else {
+            throw LyricsProviderError.processingFailed(
+                reason: "No syllable lyrics available for this track."
+            )
+        }
+
         Logger.AppleMusic.debug("lyrics fetched & parsed OK")
 
         lyrics.applyMetadata(

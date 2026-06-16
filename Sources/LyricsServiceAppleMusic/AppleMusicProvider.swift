@@ -36,18 +36,24 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
         let catalog = AppleMusicCatalog()
         let storefront = try await catalog.storefront()
 
-        let term: String
+        let searchTerm: String
+        let filterArtist: String?
         switch request.searchTerm {
         case .keyword(let keyword):
-            term = keyword
+            searchTerm = keyword
+            filterArtist = nil
         case .info(let title, let artist):
-            term = "\(title) \(artist)"
+            searchTerm = title
+            filterArtist = artist.lowercased()
         }
 
-        Logger.AppleMusic.debug("search request: term=\(term)")
-        let songs = try await catalog.search(term: term, storefront: storefront)
-        Logger.AppleMusic.debug("provider search: \(songs.count) tokens")
-        return songs.map { LyricsToken(song: $0) }
+        Logger.AppleMusic.debug("search request: term=\(searchTerm) artistFilter=\(filterArtist ?? "none")")
+        let songs = try await catalog.search(term: searchTerm, storefront: storefront)
+        let filtered = filterArtist.map { artist in
+            songs.filter { $0.artistName.lowercased().contains(artist) || artist.contains($0.artistName.lowercased()) }
+        } ?? songs
+        Logger.AppleMusic.debug("provider search: \(songs.count) raw → \(filtered.count) filtered tokens")
+        return filtered.map { LyricsToken(song: $0) }
     }
 
     public func fetch(with token: LyricsToken) async throws -> Lyrics {

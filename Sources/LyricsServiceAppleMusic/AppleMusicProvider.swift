@@ -80,7 +80,7 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
             )
         }
 
-        guard let ttml = response.data.first?.attributes.ttml, !ttml.isEmpty else {
+        guard let ttml = response.data.first?.attributes.ttmlLocalizations, !ttml.isEmpty else {
             throw LyricsProviderError.processingFailed(
                 reason: "No syllable lyrics available for this track."
             )
@@ -115,7 +115,7 @@ private struct TTMLLyricsResponse: Decodable {
         let attributes: Attributes
 
         struct Attributes: Decodable {
-            let ttml: String
+            let ttmlLocalizations: String
         }
     }
 }

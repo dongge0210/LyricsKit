@@ -24,6 +24,18 @@ extension Lyrics {
             idTags[.artist] = author
         }
 
+        // Populate attachmentTags so that Lyrics.metadata.translationLanguages
+        // reports the correct language codes (e.g. ["zh-Hans"]). Without this,
+        // consumers like KaraokeLyricsController would look up a bare Tag("tr")
+        // and miss the lang-qualified Tag("tr:zh-Hans") stored on each line.
+        if !parser.translations.isEmpty {
+            var tags = parser.metadata.attachmentTags
+            for lang in parser.translations.keys {
+                tags.insert(.translation(languageCode: lang))
+            }
+            parser.metadata.attachmentTags = tags
+        }
+
         self.init(lines: parser.lines, idTags: idTags, metadata: parser.metadata)
     }
 }
@@ -46,7 +58,7 @@ private final class TTMLParser: NSObject, XMLParserDelegate {
     private var timetagTags: [LyricsLine.Attachments.InlineTimeTag.Tag] = []
 
     // --- Translation state (lang → key → text) ---
-    private var translations: [String: [String: String]] = [:]
+    var translations: [String: [String: String]] = [:]
 
     // --- Head metadata tracking ---
     // depth > 0 → we're inside <iTunesMetadata>; route all elements

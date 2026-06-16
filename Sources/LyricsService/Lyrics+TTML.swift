@@ -195,10 +195,9 @@ private final class TTMLParser: NSObject, XMLParserDelegate {
 
         let duration = max(0, lineEnd - lineBegin)
 
-        let resolvedTags: [LyricsLine.Attachments.InlineTimeTag.Tag]
-        if timetagTags.isEmpty {
-            resolvedTags = [.init(index: 0, time: 0)]
-        } else {
+        var attachDict: [LyricsLine.Attachments.Tag: LyricsLineAttachment] = [:]
+
+        if !timetagTags.isEmpty {
             var pruned = timetagTags.map {
                 LyricsLine.Attachments.InlineTimeTag.Tag(
                     index: max(0, $0.index - leadingOffset),
@@ -208,12 +207,11 @@ private final class TTMLParser: NSObject, XMLParserDelegate {
             while let last = pruned.last, last.index >= trimmed.count {
                 pruned.removeLast()
             }
-            resolvedTags = pruned
+            attachDict[.timetag] = LyricsLine.Attachments.InlineTimeTag(
+                tags: pruned,
+                duration: duration
+            )
         }
-
-        var attachDict: [LyricsLine.Attachments.Tag: LyricsLineAttachment] = [
-            .timetag: LyricsLine.Attachments.InlineTimeTag(tags: resolvedTags, duration: duration)
-        ]
 
         // Attach translations keyed by itunes:key="L{N}"
         if let key = lineItunesKey {

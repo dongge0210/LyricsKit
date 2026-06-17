@@ -43,21 +43,37 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
 
         let searchTerm: String
         let filterArtist: String?
+        let fallbackKeyword: String?
         switch request.searchTerm {
         case .keyword(let keyword):
             searchTerm = keyword
             filterArtist = nil
+            fallbackKeyword = nil
         case .info(let title, let artist):
             searchTerm = title
             filterArtist = artist.lowercased()
+            fallbackKeyword = "\(title) \(artist)"
         }
 
         Logger.AppleMusic.debug("search request: term=\(searchTerm) artistFilter=\(filterArtist ?? "none")")
-        let songs = try await catalog.search(term: searchTerm, storefront: storefront)
-        let filtered = filterArtist.map { artist in
+        var songs = try await catalog.search(term: searchTerm, storefront: storefront)
+        var filtered = filterArtist.map { artist in
             songs.filter { $0.artistName.lowercased().contains(artist) || artist.contains($0.artistName.lowercased()) }
         } ?? songs
         Logger.AppleMusic.debug("provider search: \(songs.count) raw → \(filtered.count) filtered tokens")
+
+        // If title-only search + artist filter yields nothing, fall back to a
+        // combined "title artist" keyword search. Apple Music's own search
+        // engine matches both fields and is far less likely to miss the track.
+        if filtered.isEmpty, let fallback = fallbackKeyword {
+            Logger.AppleMusic.debug("fallback keyword search: \"\(fallback)\"")
+            songs = try await catalog.search(term: fallback, storefront: storefront)
+            filtered = filterArtist.map { artist in
+                songs.filter { $0.artistName.lowercased().contains(artist) || artist.contains($0.artistName.lowercased()) }
+            } ?? songs
+            Logger.AppleMusic.debug("fallback result: \(songs.count) raw → \(filtered.count) tokens")
+        }
+
         return filtered.map { LyricsToken(song: $0) }
     }
 

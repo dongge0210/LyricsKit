@@ -74,7 +74,7 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
         // Without it, <translations/> is always empty. Use override or system language.
         let langOverride = await AppleMusicWebSession.shared.languageOverride
         let lang = langOverride
-            ?? (Locale.preferredLanguages.first?.prefix(5))
+            ?? Locale.preferredLanguages.first.flatMap { String($0.prefix(5)) }
             ?? "zh-Hans"
         let path = "/v1/catalog/\(storefront)/songs/\(songID)/syllable-lyrics?l=\(lang)&extend=ttmlLocalizations"
         Logger.AppleMusic.debug("fetch lyrics: \(token.song.name) (id=\(songID)) lang=\(lang) storefront=\(storefront)")

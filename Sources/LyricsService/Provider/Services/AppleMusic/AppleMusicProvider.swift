@@ -86,6 +86,21 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
             )
         }
 
+        // Debug: inspect raw response for translation fields
+        if let raw = String(data: data, encoding: .utf8) {
+            // Print ~500 chars around <translations> tag
+            if let range = raw.range(of: "<translations") {
+                let start = raw.index(range.lowerBound, offsetBy: -100, limitedBy: raw.startIndex) ?? raw.startIndex
+                let end = raw.index(range.lowerBound, offsetBy: 500, limitedBy: raw.endIndex) ?? raw.endIndex
+                Logger.AppleMusic.debug("TTML around translations: \(String(raw[start..<end]))")
+            } else {
+                Logger.AppleMusic.debug("TTML has NO <translations> tag")
+            }
+            // Also check for translation-related lines in the raw TTML
+            let transLines = raw.components(separatedBy: "\n").filter { $0.contains("translat") }
+            Logger.AppleMusic.debug("raw TTML translation lines: \(transLines)")
+        }
+
         guard let ttml = response.data.first?.attributes.ttmlLocalizations, !ttml.isEmpty else {
             throw LyricsProviderError.processingFailed(
                 reason: "No syllable lyrics available for this track."

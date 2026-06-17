@@ -56,7 +56,7 @@ extension Lyrics {
            let trans = firstLine.attachments.translation() {
             print("[TTML] first line translation OK: \"\(trans.prefix(30))...\"")
         } else {
-            print("[TTML] first line MISSING translation. attachmentKeys=\(lines.first.map { $0.attachments.content.keys.map(\.rawValue) } ?? [] )")
+            print("[TTML] first line MISSING translation. hasTranslationTag=\(metadata.hasTranslation)")
         }
     }
 }

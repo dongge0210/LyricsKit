@@ -15,7 +15,6 @@ extension Lyrics {
         guard let data = xmlString.data(using: .utf8) else { return nil }
         let parser = TTMLParser()
         guard parser.parse(data: data), !parser.lines.isEmpty else {
-            print("[TTML] parse failed or no lines. translations=\(parser.translations.count) lang=\(parser.lang ?? "nil")")
             return nil
         }
 
@@ -37,27 +36,9 @@ extension Lyrics {
                 tags.insert(.translation(languageCode: lang))
             }
             parser.metadata.attachmentTags = tags
-            print("[TTML] added translation tags: \(parser.translations.keys.joined(separator: ", "))")
-        } else {
-            print("[TTML] NO translations found in parsed TTML")
         }
 
         self.init(lines: parser.lines, idTags: idTags, metadata: parser.metadata)
-
-        // Verify attachmentTags survived init
-        let transLangs = metadata.attachmentTags.compactMap { tag -> String? in
-            guard tag.rawValue.hasPrefix("tr:") else { return nil }
-            return String(tag.rawValue.dropFirst(3))
-        }
-        print("[TTML] final metadata.translations: \(transLangs) hasAnyTrans=\(metadata.hasTranslation)")
-
-        // Spot-check first line translation
-        if let firstLine = lines.first,
-           let trans = firstLine.attachments.translation() {
-            print("[TTML] first line translation OK: \"\(trans.prefix(30))...\"")
-        } else {
-            print("[TTML] first line MISSING translation. hasTranslationTag=\(metadata.hasTranslation)")
-        }
     }
 }
 
@@ -124,7 +105,6 @@ private final class TTMLParser: NSObject, XMLParserDelegate {
             beginSpan(attributes: attributeDict)
         case "iTunesMetadata":
             depthInMeta = 1
-            print("[TTML] enter iTunesMetadata attrs=\(attributeDict.keys.sorted())")
         default:
             break
         }
@@ -164,7 +144,6 @@ private final class TTMLParser: NSObject, XMLParserDelegate {
 
     private func handleMetaStart(_ elementName: String, attributes: [String: String]) {
         depthInMeta += 1
-        print("[TTML] metaStart <\(elementName)> depth=\(depthInMeta) attrs=\(attributes.keys.sorted())")
         switch elementName {
         case "translation":
             currentTranslationLang = attributes["xml:lang"] ?? attributes["lang"]
@@ -180,7 +159,6 @@ private final class TTMLParser: NSObject, XMLParserDelegate {
 
     private func handleMetaEnd(_ elementName: String) {
         depthInMeta -= 1
-        print("[TTML] metaEnd </\(elementName)> depth=\(depthInMeta)")
         switch elementName {
         case "text":
             if let key = currentTextFor, let lang = currentTranslationLang {
@@ -203,7 +181,6 @@ private final class TTMLParser: NSObject, XMLParserDelegate {
             if !songwriters.isEmpty {
                 author = songwriters.joined(separator: ", ")
             }
-            print("[TTML] header done: translations=\(translations.count) langs=\(Array(translations.keys)) songwriters=\(songwriters.count)")
             // depthInMeta is now 0 — back to body parsing.
         default:
             break
@@ -259,8 +236,6 @@ private final class TTMLParser: NSObject, XMLParserDelegate {
                     attachDict[tag] = LyricsLine.Attachments.PlainText(text)
                 }
             }
-        } else {
-            print("[TTML] WARNING: endLine with no itunes:key! content=\"\(trimmed.prefix(20))...\" begin=\(lineBegin)")
         }
 
         let attachments = LyricsLine.Attachments(attachments: attachDict)

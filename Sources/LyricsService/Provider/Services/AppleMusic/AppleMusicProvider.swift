@@ -60,8 +60,11 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
         let catalog = AppleMusicCatalog()
         let storefront = try await catalog.storefront()
         let songID = token.song.id
-        let path = "/v1/catalog/\(storefront)/songs/\(songID)/syllable-lyrics?extend=ttmlLocalizations"
-        Logger.AppleMusic.debug("fetch lyrics: \(token.song.name) (id=\(songID))")
+        // Apple Music requires &l=<lang> to include translations in the TTML response.
+        // Without it, <translations/> is always empty. Use system preferred language.
+        let lang = Locale.preferredLanguages.first?.prefix(5) ?? "zh-Hans"
+        let path = "/v1/catalog/\(storefront)/songs/\(songID)/syllable-lyrics?l=\(lang)&extend=ttmlLocalizations"
+        Logger.AppleMusic.debug("fetch lyrics: \(token.song.name) (id=\(songID)) lang=\(lang)")
 
         let data: Data
         do {
@@ -84,21 +87,6 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
             throw LyricsProviderError.processingFailed(
                 reason: "Failed to decode TTML response: \(error.localizedDescription)"
             )
-        }
-
-        // Debug: inspect raw response for translation fields
-        if let raw = String(data: data, encoding: .utf8) {
-            // Print ~500 chars around <translations> tag
-            if let range = raw.range(of: "<translations") {
-                let start = raw.index(range.lowerBound, offsetBy: -100, limitedBy: raw.startIndex) ?? raw.startIndex
-                let end = raw.index(range.lowerBound, offsetBy: 500, limitedBy: raw.endIndex) ?? raw.endIndex
-                Logger.AppleMusic.debug("TTML around translations: \(String(raw[start..<end]))")
-            } else {
-                Logger.AppleMusic.debug("TTML has NO <translations> tag")
-            }
-            // Also check for translation-related lines in the raw TTML
-            let transLines = raw.components(separatedBy: "\n").filter { $0.contains("translat") }
-            Logger.AppleMusic.debug("raw TTML translation lines: \(transLines)")
         }
 
         guard let ttml = response.data.first?.attributes.ttmlLocalizations, !ttml.isEmpty else {

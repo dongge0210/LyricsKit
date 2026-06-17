@@ -72,7 +72,8 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
         let songID = token.song.id
         // Apple Music requires &l=<lang> to include translations in the TTML response.
         // Without it, <translations/> is always empty. Use override or system language.
-        let lang = await AppleMusicWebSession.shared.languageOverride
+        let langOverride = await AppleMusicWebSession.shared.languageOverride
+        let lang = langOverride
             ?? (Locale.preferredLanguages.first?.prefix(5))
             ?? "zh-Hans"
         let path = "/v1/catalog/\(storefront)/songs/\(songID)/syllable-lyrics?l=\(lang)&extend=ttmlLocalizations"

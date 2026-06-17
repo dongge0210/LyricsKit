@@ -124,6 +124,7 @@ private final class TTMLParser: NSObject, XMLParserDelegate {
             beginSpan(attributes: attributeDict)
         case "iTunesMetadata":
             depthInMeta = 1
+            print("[TTML] enter iTunesMetadata attrs=\(attributeDict.keys.sorted())")
         default:
             break
         }
@@ -163,6 +164,7 @@ private final class TTMLParser: NSObject, XMLParserDelegate {
 
     private func handleMetaStart(_ elementName: String, attributes: [String: String]) {
         depthInMeta += 1
+        print("[TTML] metaStart <\(elementName)> depth=\(depthInMeta) attrs=\(attributes.keys.sorted())")
         switch elementName {
         case "translation":
             currentTranslationLang = attributes["xml:lang"] ?? attributes["lang"]
@@ -178,7 +180,7 @@ private final class TTMLParser: NSObject, XMLParserDelegate {
 
     private func handleMetaEnd(_ elementName: String) {
         depthInMeta -= 1
-
+        print("[TTML] metaEnd </\(elementName)> depth=\(depthInMeta)")
         switch elementName {
         case "text":
             if let key = currentTextFor, let lang = currentTranslationLang {

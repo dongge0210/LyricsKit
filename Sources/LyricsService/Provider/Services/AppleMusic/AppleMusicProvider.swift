@@ -34,7 +34,12 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
 
     public func search(for request: LyricsSearchRequest) async throws -> [LyricsToken] {
         let catalog = AppleMusicCatalog()
-        let storefront = AppleMusicWebSession.shared.storefrontOverride ?? (try await catalog.storefront())
+        let storefront: String
+        if let override = AppleMusicWebSession.shared.storefrontOverride {
+            storefront = override
+        } else {
+            storefront = try await catalog.storefront()
+        }
 
         let searchTerm: String
         let filterArtist: String?
@@ -58,7 +63,12 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
 
     public func fetch(with token: LyricsToken) async throws -> Lyrics {
         let catalog = AppleMusicCatalog()
-        let storefront = AppleMusicWebSession.shared.storefrontOverride ?? (try await catalog.storefront())
+        let storefront: String
+        if let override = AppleMusicWebSession.shared.storefrontOverride {
+            storefront = override
+        } else {
+            storefront = try await catalog.storefront()
+        }
         let songID = token.song.id
         // Apple Music requires &l=<lang> to include translations in the TTML response.
         // Without it, <translations/> is always empty. Use override or system language.

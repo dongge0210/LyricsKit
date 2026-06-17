@@ -34,7 +34,7 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
 
     public func search(for request: LyricsSearchRequest) async throws -> [LyricsToken] {
         let catalog = AppleMusicCatalog()
-        let storefront = try await catalog.storefront()
+        let storefront = AppleMusicWebSession.shared.storefrontOverride ?? (try await catalog.storefront())
 
         let searchTerm: String
         let filterArtist: String?
@@ -58,13 +58,15 @@ extension LyricsProviders.AppleMusic: _LyricsProvider {
 
     public func fetch(with token: LyricsToken) async throws -> Lyrics {
         let catalog = AppleMusicCatalog()
-        let storefront = try await catalog.storefront()
+        let storefront = AppleMusicWebSession.shared.storefrontOverride ?? (try await catalog.storefront())
         let songID = token.song.id
         // Apple Music requires &l=<lang> to include translations in the TTML response.
-        // Without it, <translations/> is always empty. Use system preferred language.
-        let lang = Locale.preferredLanguages.first?.prefix(5) ?? "zh-Hans"
+        // Without it, <translations/> is always empty. Use override or system language.
+        let lang = AppleMusicWebSession.shared.languageOverride
+            ?? (Locale.preferredLanguages.first?.prefix(5))
+            ?? "zh-Hans"
         let path = "/v1/catalog/\(storefront)/songs/\(songID)/syllable-lyrics?l=\(lang)&extend=ttmlLocalizations"
-        Logger.AppleMusic.debug("fetch lyrics: \(token.song.name) (id=\(songID)) lang=\(lang)")
+        Logger.AppleMusic.debug("fetch lyrics: \(token.song.name) (id=\(songID)) lang=\(lang) storefront=\(storefront)")
 
         let data: Data
         do {

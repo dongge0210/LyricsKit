@@ -33,6 +33,16 @@ public final class AppleMusicWebSession: NSObject {
     private var didStartLoading = false
     private var pageLoadContinuation: CheckedContinuation<Void, Never>?
 
+    /// Override the storefront auto-detection. When set, skips the
+    /// `/v1/me/storefront` API call and uses this value directly.
+    /// 2-letter country code, e.g. `"cn"`, `"us"`, `"jp"`.
+    public var storefrontOverride: String?
+
+    /// Override the language used for TTML translations.
+    /// When set, uses this value instead of the system's preferred language.
+    /// e.g. `"zh-Hans"`, `"zh-hans-cn"`.
+    public var languageOverride: String?
+
     public override init() {
         let configuration = WKWebViewConfiguration()
         // The default website data store is persistent: cookies survive
